@@ -25,10 +25,10 @@ wb_metadata <- read_csv(here("data", "wb_indicators_metadata.csv"))
 
 ## Tidy up data
 
-"Years" column titles: needs own column
-"Series Name" column: separate into different variables
+"Years" column titles: needs own column "Series Name" column: separate into different variables
 
 ### Combine the years columns
+
 ```{r}
 wb_indicators_long <- pivot_longer(wb_indicators, 
                                    cols = '2001 [YR2001]':'2020 [YR2020]', 
@@ -43,6 +43,7 @@ wb_indicators_long <- wb_indicators %>% pivot_longer(cols = -(1:4),
 ```
 
 ### Separate to clean up the year column
+
 ```{r}
 wb_separate <- wb_indicators_long |> 
   separate(col = year, into = c("year", "year_chr"), sep = " ") |> 
@@ -60,6 +61,7 @@ wb_separate <- wb_indicators_long |>
 ```
 
 ### Separate Series column
+
 ```{r}
 unique('Series Name')
 
@@ -70,8 +72,8 @@ wb_clean <- wb_separate |>
 ```
 
 ### Rename column names
-Rename from dplyr (great if just one)
-Janitor if simple column names
+
+Rename from dplyr (great if just one) Janitor if simple column names
 
 ```{r}
 names(wb_clean)
@@ -85,7 +87,9 @@ wb_clean_2 <- wb_clean |>
 ```
 
 ### Example of filtering
+
 This is why tidy data is useful
+
 ```{r}
 wb_subset <- wb_clean |> 
   filter(country %in% c("Sweden", "Thailand", "Trinidad and Tobago", "Botswana"))
@@ -95,7 +99,219 @@ ggplot(data = wb_subset, aes(x = year, y = co2_emissions_kt)) +
   facet_wrap(~country)
 ```
 
+## Filtering Rows
+
+### Filter to only keep exact matches
+
 ```{r}
+ex_1 <- starwars |> 
+  filter(height > 180)
+min(ex_1$height)
+```
+
+```{r}
+ex_2 <- starwars |> 
+  filter(eye_color == "yellow")
+unique(ex_2$eye_color)
+```
+
+```{r}
+ex_3 <- starwars |> 
+  filter(homeworld == "Naboo")
+unique(ex_3$homeworld)
+```
+
+### Filter to satisfy multiple conditions
+
+AND statements
+```{r}
+ex_4 <- starwars |> 
+  filter(height > 180 & homeworld == "Tatooine")
+unique(ex_4$homeworld)
+unique(ex_4$height)
+```
+
+```{r}
+ex_5 <- starwars |> 
+  filter(hair_color == "brown" & species == "Human")
+unique(ex_5$hair_color)
+unique(ex_5$species)
+```
+
+OR statements
+```{r}
+ex_6 <- starwars |> 
+  filter(height > 180 | eye_color == "yellow")
+unique(ex_6$eye_color)
+unique(ex_6$height)
+```
+
+```{r}
+ex_7 <- starwars |> 
+  filter(homeworld == "Endor" | species == "Droid")
+```
+
+Writing a different way when referring to multiple character values
+```{r}
+ex_8 <- starwars |> filter(eye_color %in% c("blue", "brown", "red"))
+unique(ex_8$eye_color)
+
+# DO NOT USE == , will search IN ORDER of one vector value with each row instead of asking for all of them
+```
+
+```{r}
+ex_11 <- starwars |> 
+  filter(homeworld %in% c("Endor", "Tatooine", "Naboo"),
+         height < 150)
+view(ex_11)
+```
+
+#### Negate Operator
+```{r}
+ex_12 <- starwars |> 
+  filter(species != "Human")
+unique(ex_12$species)
+```
+
+## Select or exclude columns
+
+Select by name
+```{r}
+ex_14 <- wb_clean |> 
+  select(country, year, co2_emissions_kt)
+names(ex_14)
+```
+
+Select range of names
+```{r}
+ex_15 <- wb_clean |> 
+  select(year:fossil_fuel_cons_pct)
+# Risky do to because range is positional and columns can be moved around
+names(ex_15)
+```
+
+Exclude one from range
+```{r}
+ex_16 <- wb_clean |> 
+  select(year:fossil_fuel_cons_pct, - access_electricity_pp)
+names(ex_16)
+```
+
+Use it to rename/move things around
+```{r}
+ex_18 <- wb_clean |> 
+  select(year_new = year,
+         emissions = co2_emissions_kt,
+         country_name = country)
+glimpse(ex_18)
+```
+
+### Pipe some together
+```{r}
+ex_17 <- wb_clean |> 
+  filter(country %in% c("Bolivia", "Chile", "Mexico")) |> 
+  select(country:fossil_fuel_cons_pct)
+names(ex_17)
+unique(ex_17$country)
+```
+
+Practice
+```{r}
+ex_19 <- wb_clean |> 
+  select(year, country, water_stress) |> 
+  filter(country %in% c("Cambodia", "South Africa", "Nepal"))
+unique(ex_19$country)
+glimpse(ex_19)
+```
+
+
+### Rename columns
+
+Select requires many selections for renaming
+```{r}
+ex_20 <- wb_clean |> 
+  rename(ffcp = fossil_fuel_cons_pct,
+         ws = water_stress)
+ex_21 <- wb_clean |> 
+  rename(co2_e_kt = co2_emissions_kt,
+         the_country = country)
+```
+
+### Mutate columns
+If you assign a NEW column name, it will add a new column to the end of the data frame.
+If assign an EXISTING column name, it will overwrite the existing column.
+
+```{r}
+ex_22 <- wb_clean |> 
+  mutate(co2_emissions_t = co2_emissions_kt * 1000) |> 
+  relocate(co2_emissions_t, .after = co2_emissions_kt)
+
+ex_23 <- wb_clean |> 
+  mutate(yay = "YAY")
+
+ex_24 <- wb_clean |> 
+  mutate(year = as.character(year))
+class(ex_24$year)
+
+
+
+```
+
+### Relocate columns
+dplyr::relocate
+Can move conditionally by classes (ie. all numeric after all character columns)
+```{r}
+ex_25 <- wb_clean |> 
+  relocate(water_stress, .after = year)
+```
+
+
+## Groupby Summarize
+
+Group_by: Creates groups under the hood based on variables specified
+Summaraize: apply functions to each GROUP and return in summary table
+
+```{r}
+ex_27 <- starwars |> 
+  filter(homeworld %in% c("Naboo", "Tatooine")) |> 
+  group_by(species, homeworld) |> 
+  summarize(mean_height = mean(height, na.rm = TRUE),
+            mean_mass = mean(mass, na.rm = TRUE))
+view(ex_27)
+```
+
+Make a data frame
+Frequency table
+Case table - each observation gets its own row
+```{r}
+df <- tribble(
+  ~species, ~length, ~number,
+  "lobster", 12, 4,
+  "lobster", 14, 6,
+  "lobster", 15, 2
+)
+df_case <- df |> 
+  uncount(number)
+df_og <- df_case |> 
+  count(species, length)
+# count is a combo of group_by, summarize, n
+
+starwars |> 
+  count(homeworld, species)
+# THese two are the same
+starwars |> 
+  group_by(homeworld, species) |> 
+  summarize(size = n())
+```
+
+```{r}
+ex_30 <- wb_clean |> 
+  filter(country %in% c("Nicaragua", "Ecuador", "Peru", "Chile"),
+         year > 2005) |> 
+  select(country, year, co2_emissions_kt) |> 
+  mutate(co2_em_mg = co2_emissions_kt * 1000) |> 
+  group_by(year) |> 
+  summarize(sum(co2_em_mg))
 
 ```
 
