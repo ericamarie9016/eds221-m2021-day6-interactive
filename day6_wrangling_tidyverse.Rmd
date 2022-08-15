@@ -1,0 +1,101 @@
+---
+title: "Day Wrangling in Tidyverse tidyr"
+author: "Erica Dale"
+date: "2022-08-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+library(tidyverse)
+library(janitor)
+library(here)
+```
+
+## Read In World Bank data files
+
+```{r}
+wb_indicators <- read_csv(here("data", "wb_indicators.csv"), na = c("..", ""))
+
+# View the data
+### Unknown values are .. and "" which are auto-read as characters for a column
+
+wb_metadata <- read_csv(here("data", "wb_indicators_metadata.csv"))
+```
+
+## Tidy up data
+
+"Years" column titles: needs own column
+"Series Name" column: separate into different variables
+
+### Combine the years columns
+```{r}
+wb_indicators_long <- pivot_longer(wb_indicators, 
+                                   cols = '2001 [YR2001]':'2020 [YR2020]', 
+                                   names_to = "year",
+                                   values_to = "indicator_value"
+                                   )
+names(wb_indicators)
+# OR
+wb_indicators_long <- wb_indicators %>% pivot_longer(cols = -(1:4),
+                               names_to = "year",
+                               values_to = "indicator_value")
+```
+
+### Separate to clean up the year column
+```{r}
+wb_separate <- wb_indicators_long |> 
+  separate(col = year, into = c("year", "year_chr"), sep = " ") |> 
+  select(-year_chr, -'Series Code', - 'Country Code')
+
+class(wb_separate$year) # Still character value
+glimpse(wb_separate)
+
+# Update year class
+
+wb_separate <- wb_indicators_long |> 
+  separate(col = year, into = c("year", "year_chr"), sep = " ") |> 
+  select(-year_chr, -'Series Code', - 'Country Code') |> 
+  mutate(year = as.numeric(year))
+```
+
+### Separate Series column
+```{r}
+unique('Series Name')
+
+wb_clean <- wb_separate |> 
+  drop_na('Series Name') |>   # NEED TO DROP NA for column names
+  pivot_wider(names_from = 'Series Name', values_from = indicator_value)
+
+```
+
+### Rename column names
+Rename from dplyr (great if just one)
+Janitor if simple column names
+
+```{r}
+names(wb_clean)
+names(wb_clean) <- c("country", "year", "access_clean_fuels_pp", "access_electricity_pp", "co2_emissions_kt", "fossil_fuel_cons_pct", "water_stress")
+
+# Names cannot be piped into
+
+wb_clean_2 <- wb_clean |> 
+  rename(the_year = year,
+         the_country = country)
+```
+
+### Example of filtering
+This is why tidy data is useful
+```{r}
+wb_subset <- wb_clean |> 
+  filter(country %in% c("Sweden", "Thailand", "Trinidad and Tobago", "Botswana"))
+
+ggplot(data = wb_subset, aes(x = year, y = co2_emissions_kt)) +
+  geom_line(aes(color = country)) +
+  facet_wrap(~country)
+```
+
+```{r}
+
+```
+
